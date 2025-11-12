@@ -1,0 +1,153 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Interface utilisateur</title>
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; }
+      h1 { margin-bottom: .5rem; }
+      .card { border: 1px solid #ddd; border-radius: 8px; padding: 1rem 1.25rem; margin: 1rem 0; }
+      label { display:block; margin:.5rem 0 .25rem; }
+      input { width: 100%; padding:.5rem; }
+      button { margin-top:.75rem; padding:.5rem .75rem; cursor:pointer; }
+      #status { margin-top:.75rem; font-weight:600; }
+      .ok { color: #177245; }
+      .err { color: #b00020; }
+      .row { display:flex; gap:1rem; align-items:center; }
+      .row > * { flex: 1 1 auto; }
+      .hidden { display: none; }
+    </style>
+  </head>
+  <body>
+    <h1>Interface utilisateur Series Reco 🎬</h1>
+
+    <!-- Bloc connexion -->
+    <div class="card">
+      <h3>Connexion</h3>
+      <form id="login-form">
+        <label for="login">Login</label>
+        <input id="login" name="login" autocomplete="username" required />
+
+        <label for="password">Mot de passe</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required />
+
+        <div class="row">
+          <button type="submit">Se connecter</button>
+          <button type="button" id="logout-btn">Se déconnecter</button>
+        </div>
+      </form>
+      <div id="status"></div>
+    </div>
+
+    <!-- Ici on mettra ensuite la recherche / recommandations -->
+   <div class="card hidden" id="search-card">
+  <h3>Recherche</h3>
+  <form id="search-form">
+    <label for="q">Mots-clés</label>
+    <div class="row">
+      <input id="q" placeholder="ex: futur, policier, drame..." />
+      <button type="submit">Rechercher</button>
+    </div>
+  </form>
+
+  <ul id="results" style="margin-top:1rem;"></ul>
+</div>
+
+    <script>
+  // --- éléments du DOM ---
+  const form = document.getElementById("login-form");
+  const statusEl = document.getElementById("status");
+  const logoutBtn = document.getElementById("logout-btn");
+
+  const searchCard = document.getElementById("search-card");
+  const searchForm = document.getElementById("search-form");
+  const resultsEl = document.getElementById("results");
+
+  // Affiche/masque la zone de recherche selon l'état de connexion
+  function updateUI() {
+    const login = localStorage.getItem("login");
+    if (login) {
+      searchCard.classList.remove("hidden");
+    } else {
+      searchCard.classList.add("hidden");
+      if (resultsEl) resultsEl.innerHTML = "";
+    }
+  }
+
+  // Si on a déjà un login en localStorage, on l’affiche
+  const savedLogin = localStorage.getItem("login");
+  if (savedLogin) {
+    statusEl.textContent = `Connecté en tant que ${savedLogin}`;
+    statusEl.className = "ok";
+  }
+  updateUI(); // état initial de l’UI
+
+  // --- Connexion ---
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    statusEl.textContent = "";
+    statusEl.className = "";
+
+    const login = document.getElementById("login").value.trim();
+    const password = document.getElementById("password").value;
+
+    try {
+      const resp = await fetch("/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ login, password })
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.detail || `Erreur HTTP ${resp.status}`);
+      }
+
+      const data = await resp.json(); // {status:"ok", login:"..."}
+      localStorage.setItem("login", data.login);
+      statusEl.textContent = `Connecté en tant que ${data.login}`;
+      statusEl.className = "ok";
+      updateUI();            // ➜ montre la recherche
+    } catch (err) {
+      statusEl.textContent = err.message || "Erreur de connexion";
+      statusEl.className = "err";
+      localStorage.removeItem("login");
+      updateUI();            // ➜ cache la recherche
+    }
+  });
+
+  // --- Déconnexion ---
+  logoutBtn.addEventListener("click", () => {
+    localStorage.removeItem("login");
+    statusEl.textContent = "Déconnecté.";
+    statusEl.className = "err";
+    form.reset();
+    updateUI();              // ➜ cache la recherche
+  });
+
+  // --- Recherche ---
+  if (searchForm) {
+    searchForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const q = document.getElementById("q").value.trim();
+      if (!q) return;
+
+      try {
+        const resp = await fetch(`/search?q=${encodeURIComponent(q)}`);
+        if (!resp.ok) throw new Error(`Erreur HTTP ${resp.status}`);
+        const data = await resp.json(); // { results: [...] }
+
+        resultsEl.innerHTML = data.results.length
+          ? data.results
+              .map(r => `<li><b>${r.show_name}</b> — score: ${r.score.toFixed(1)}</li>`)
+              .join("")
+          : "<li>Aucun résultat trouvé.</li>";
+      } catch (err) {
+        resultsEl.innerHTML = `<li style="color:#b00020">${err.message}</li>`;
+      }
+    });
+  }
+</script>
+
+  </body>
+</html>

@@ -1,0 +1,49 @@
+http://127.0.0.1:8000/debug/token-stats?file=data/desperatehousewivess03e01VF.srt&top=25
+
+
+http://127.0.0.1:8000/debug/clean-srt?file=data/desperatehousewivess03e01VF.srt
+
+
+http://127.0.0.1:8000/debug/preview-srt?file=data/desperatehousewivess03e01VF.srt
+
+http://127.0.0.1:8000/db/health
+
+
+.\.venv\Scripts\activate
+
+
+docker compose up -d
+
+
+uvicorn app.main:app --reload
+
+quand c'est la merde:
+taskkill /PID 10364 /F
+
+
+netstat -ano | findstr :8000
+
+
+# depuis le dossier du projet
+docker exec -it sae_db psql -U sae -d sae_db
+
+
+
+cd C:\Users\Etudiant\Desktop\Cours\S5\S5.C01\
+
+
+SELECT show_name, COUNT(*) 
+FROM episodes 
+GROUP BY show_name 
+ORDER BY COUNT(*) DESC;
+
+
+SELECT id, show_name, season, episode, file_path
+FROM episodes
+WHERE show_name ILIKE '%theoc%'
+  AND season = 3
+  AND episode = ;
+
+http://127.0.0.1:8000/app
+
+http://127.0.0.1:8000/
