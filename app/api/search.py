@@ -6,7 +6,7 @@ from app.services.normalize import normalize_line
 router = APIRouter(prefix="/search", tags=["Search"])
 
 CANDIDATE_POOL = 100  # on récupère plus d'épisodes pour un meilleur rerank par série
-LIMIT = 5            # limite finale affichée
+LIMIT = 6            # limite finale affichée
 
 # ---------- Requêtes SQL de base (AND et OR) ----------
 

@@ -1,153 +1,292 @@
 <!doctype html>
-<html>
+<html lang="fr">
   <head>
     <meta charset="utf-8" />
-    <title>Interface utilisateur</title>
-    <style>
-      body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; }
-      h1 { margin-bottom: .5rem; }
-      .card { border: 1px solid #ddd; border-radius: 8px; padding: 1rem 1.25rem; margin: 1rem 0; }
-      label { display:block; margin:.5rem 0 .25rem; }
-      input { width: 100%; padding:.5rem; }
-      button { margin-top:.75rem; padding:.5rem .75rem; cursor:pointer; }
-      #status { margin-top:.75rem; font-weight:600; }
-      .ok { color: #177245; }
-      .err { color: #b00020; }
-      .row { display:flex; gap:1rem; align-items:center; }
-      .row > * { flex: 1 1 auto; }
-      .hidden { display: none; }
-    </style>
+    <title>Series Reco</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/static/style.css" />
   </head>
   <body>
-    <h1>Interface utilisateur Series Reco 🎬</h1>
-
-    <!-- Bloc connexion -->
-    <div class="card">
-      <h3>Connexion</h3>
-      <form id="login-form">
-        <label for="login">Login</label>
-        <input id="login" name="login" autocomplete="username" required />
-
-        <label for="password">Mot de passe</label>
-        <input id="password" name="password" type="password" autocomplete="current-password" required />
-
-        <div class="row">
-          <button type="submit">Se connecter</button>
-          <button type="button" id="logout-btn">Se déconnecter</button>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="logo">SR</span>
+          <span class="brand-text">Series Reco</span>
         </div>
-      </form>
-      <div id="status"></div>
-    </div>
+        <div class="topbar-user" id="topbar-user"></div>
+      </header>
 
-    <!-- Ici on mettra ensuite la recherche / recommandations -->
-   <div class="card hidden" id="search-card">
-  <h3>Recherche</h3>
-  <form id="search-form">
-    <label for="q">Mots-clés</label>
-    <div class="row">
-      <input id="q" placeholder="ex: futur, policier, drame..." />
-      <button type="submit">Rechercher</button>
-    </div>
-  </form>
+      <main class="main">
+        <!-- Hero -->
+        <section class="hero">
+          <div class="hero-text">
+            <h1>Retrouvez et recommandez vos séries préférées 🎬</h1>
+            <p>
+              Tape quelques mots-clés, note tes séries, et laisse le moteur te
+              proposer de nouvelles idées comme sur Netflix ou Disney+.
+            </p>
+          </div>
+        </section>
 
-  <ul id="results" style="margin-top:1rem;"></ul>
-</div>
+        <!-- Recherche -->
+        <section class="panel" id="search-panel">
+          <div class="panel-header">
+            <h2>Recherche</h2>
+            <p>Les résultats s’affichent juste en dessous, façon catalogue.</p>
+          </div>
+
+          <form id="search-form" class="search-bar">
+            <input id="q" placeholder="ex : crash avion île, policier, futur..." />
+            <button type="submit" class="btn primary">Rechercher</button>
+          </form>
+
+          <h3 class="section-title">Résultats</h3>
+          <div class="cards-row" id="search-results"></div>
+        </section>
+
+        <!-- Notation des séries -->
+        <section class="panel" id="rate-panel">
+          <div class="panel-header">
+            <h2>Noter des séries</h2>
+            <p>Plus tu notes de séries, plus les recommandations seront pertinentes.</p>
+          </div>
+
+          <form id="rate-form" class="form-inline">
+            <input id="rate-show" placeholder="Nom de la série (ex : ncis)" required />
+            <select id="rate-value" required>
+              <option value="">Note</option>
+              <option value="1">1 ⭐</option>
+              <option value="2">2 ⭐⭐</option>
+              <option value="3">3 ⭐⭐⭐</option>
+              <option value="4">4 ⭐⭐⭐⭐</option>
+              <option value="5">5 ⭐⭐⭐⭐⭐</option>
+            </select>
+            <button type="submit" class="btn primary">Enregistrer</button>
+          </form>
+
+          <h3 class="section-title">Mes notes</h3>
+
+          <!-- Cartes de notes -->
+          <div class="cards-row" id="ratings-list"></div>
+        </section>
+
+        <!-- Recommandations -->
+        <section class="panel" id="reco-panel">
+          <div class="panel-header">
+            <h2>Recommandations pour toi</h2>
+            <button id="refresh-reco" class="btn ghost small">Rafraîchir</button>
+          </div>
+
+          <div class="cards-row" id="reco-results"></div>
+        </section>
+      </main>
+    </div>
 
     <script>
-  // --- éléments du DOM ---
-  const form = document.getElementById("login-form");
-  const statusEl = document.getElementById("status");
-  const logoutBtn = document.getElementById("logout-btn");
+      /* --------------------- Sécurité connexion --------------------- */
+      function currentUser() {
+        return localStorage.getItem("login");
+      }
 
-  const searchCard = document.getElementById("search-card");
-  const searchForm = document.getElementById("search-form");
-  const resultsEl = document.getElementById("results");
+      if (!currentUser()) {
+        window.location.href = "/login";
+      }
 
-  // Affiche/masque la zone de recherche selon l'état de connexion
-  function updateUI() {
-    const login = localStorage.getItem("login");
-    if (login) {
-      searchCard.classList.remove("hidden");
-    } else {
-      searchCard.classList.add("hidden");
-      if (resultsEl) resultsEl.innerHTML = "";
-    }
-  }
+      /* --------------------- Helpers posters --------------------- */
+      function normalizeKey(showName) {
+        if (!showName) return "";
+        return showName.toLowerCase().replace(/\s+/g, "");
+      }
 
-  // Si on a déjà un login en localStorage, on l’affiche
-  const savedLogin = localStorage.getItem("login");
-  if (savedLogin) {
-    statusEl.textContent = `Connecté en tant que ${savedLogin}`;
-    statusEl.className = "ok";
-  }
-  updateUI(); // état initial de l’UI
+      function getPoster(showName) {
+        const key = normalizeKey(showName);
+        return `/static/posters/${key}.png`;
+      }
 
-  // --- Connexion ---
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    statusEl.textContent = "";
-    statusEl.className = "";
+      /* --------------------- Sélecteurs DOM --------------------- */
+      const topbarUser = document.getElementById("topbar-user");
+      const searchForm = document.getElementById("search-form");
+      const searchResults = document.getElementById("search-results");
+      const rateForm = document.getElementById("rate-form");
+      const ratingsList = document.getElementById("ratings-list");
+      const recoResults = document.getElementById("reco-results");
+      const refreshRecoBtn = document.getElementById("refresh-reco");
 
-    const login = document.getElementById("login").value.trim();
-    const password = document.getElementById("password").value;
+      /* --------------------- Header --------------------- */
+      if (topbarUser && currentUser()) {
+        topbarUser.textContent = "Connecté : " + currentUser();
+      }
 
-    try {
-      const resp = await fetch("/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ login, password })
+      /* --------------------- Cartes --------------------- */
+      function renderShowCards(container, items, { showScore } = {}) {
+        if (!items || !items.length) {
+          container.innerHTML = '<p class="empty">Rien pour l’instant…</p>';
+          return;
+        }
+
+        container.innerHTML = items
+          .map((s) => {
+            const scoreHtml =
+              showScore && s.score
+                ? `<p class="show-score">Score : ${s.score.toFixed(0)}</p>`
+                : "";
+            return `
+              <article class="show-card">
+                <div class="show-poster">
+                  <img src="${getPoster(s.show_name)}"
+                       alt="${s.show_name}"
+                       loading="lazy"
+                       onerror="this.onerror=null; this.src='/static/posters/default.png';" />
+                </div>
+                <div class="show-meta">
+                  <h3 class="show-title">${s.show_name}</h3>
+                  ${scoreHtml}
+                </div>
+              </article>
+            `;
+          })
+          .join("");
+      }
+
+      /* Cartes pour les notes */
+      function renderRatingCards(items) {
+        if (!items || !items.length) {
+          ratingsList.innerHTML =
+            '<p class="empty">Aucune note pour l’instant.</p>';
+          return;
+        }
+
+        ratingsList.innerHTML = items
+          .map((r) => {
+            return `
+              <article class="show-card">
+                <div class="show-poster">
+                  <img src="${getPoster(r.show_name)}"
+                       alt="${r.show_name}"
+                       loading="lazy"
+                       onerror="this.onerror=null; this.src='/static/posters/default.png';" />
+                </div>
+                <div class="show-meta">
+                  <h3 class="show-title">${r.show_name}</h3>
+                  <p class="show-score">${r.rating} ⭐</p>
+                </div>
+              </article>
+            `;
+          })
+          .join("");
+      }
+
+      /* --------------------- Recherche --------------------- */
+      function groupByShow(results) {
+        const best = {};
+        for (const r of results || []) {
+          if (!best[r.show_name] || r.score > best[r.show_name].score) {
+            best[r.show_name] = r;
+          }
+        }
+        return Object.values(best);
+      }
+
+      if (searchForm) {
+        searchForm.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const q = document.getElementById("q").value.trim();
+          if (!q) return;
+
+          searchResults.innerHTML =
+            '<p class="info">Recherche en cours...</p>';
+
+          try {
+            const resp = await fetch(`/search?q=${encodeURIComponent(q)}`);
+            const data = await resp.json();
+            renderShowCards(searchResults, groupByShow(data.results), {
+              showScore: true,
+            });
+          } catch (err) {
+            searchResults.innerHTML = `<p class="error">${err.message}</p>`;
+          }
+        });
+      }
+
+      /* --------------------- Notes --------------------- */
+      async function loadRatings() {
+        const user = currentUser();
+        try {
+          const resp = await fetch(`/user/ratings/${user}`);
+          const data = await resp.json();
+          renderRatingCards(data.ratings);
+        } catch {
+          ratingsList.innerHTML = `<p class="error">Erreur de chargement</p>`;
+        }
+      }
+
+      rateForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const user = currentUser();
+        if (!user) {
+          alert("Tu dois être connecté pour noter des séries.");
+          window.location.href = "/login";
+          return;
+        }
+
+        const showName = document.getElementById("rate-show").value.trim();
+        const rating = parseInt(
+          document.getElementById("rate-value").value,
+          10
+        );
+
+        if (!showName || !rating) {
+          return;
+        }
+
+        try {
+          const resp = await fetch("/user/rate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              user_id: user,
+              show_name: showName,
+              rating: rating,
+            }),
+          });
+
+          if (!resp.ok) {
+            // On récupère le message envoyé par FastAPI
+            const data = await resp.json().catch(() => ({}));
+            const msg =
+              data.detail || "Erreur lors de l’enregistrement.";
+            throw new Error(msg);
+          }
+
+          await loadRatings();
+          await loadRecommendations();
+          rateForm.reset();
+        } catch (err) {
+          alert(err.message);
+        }
       });
 
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        throw new Error(err.detail || `Erreur HTTP ${resp.status}`);
+      /* --------------------- Recommandations --------------------- */
+      async function loadRecommendations() {
+        const user = currentUser();
+        recoResults.innerHTML =
+          '<p class="info">Calcul des recommandations...</p>';
+
+        try {
+          const resp = await fetch(`/user/recommend/${user}`);
+          const data = await resp.json();
+          renderShowCards(recoResults, data.results, { showScore: true });
+        } catch {
+          recoResults.innerHTML = `<p class="error">Erreur de chargement</p>`;
+        }
       }
 
-      const data = await resp.json(); // {status:"ok", login:"..."}
-      localStorage.setItem("login", data.login);
-      statusEl.textContent = `Connecté en tant que ${data.login}`;
-      statusEl.className = "ok";
-      updateUI();            // ➜ montre la recherche
-    } catch (err) {
-      statusEl.textContent = err.message || "Erreur de connexion";
-      statusEl.className = "err";
-      localStorage.removeItem("login");
-      updateUI();            // ➜ cache la recherche
-    }
-  });
+      refreshRecoBtn.addEventListener("click", loadRecommendations);
 
-  // --- Déconnexion ---
-  logoutBtn.addEventListener("click", () => {
-    localStorage.removeItem("login");
-    statusEl.textContent = "Déconnecté.";
-    statusEl.className = "err";
-    form.reset();
-    updateUI();              // ➜ cache la recherche
-  });
-
-  // --- Recherche ---
-  if (searchForm) {
-    searchForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const q = document.getElementById("q").value.trim();
-      if (!q) return;
-
-      try {
-        const resp = await fetch(`/search?q=${encodeURIComponent(q)}`);
-        if (!resp.ok) throw new Error(`Erreur HTTP ${resp.status}`);
-        const data = await resp.json(); // { results: [...] }
-
-        resultsEl.innerHTML = data.results.length
-          ? data.results
-              .map(r => `<li><b>${r.show_name}</b> — score: ${r.score.toFixed(1)}</li>`)
-              .join("")
-          : "<li>Aucun résultat trouvé.</li>";
-      } catch (err) {
-        resultsEl.innerHTML = `<li style="color:#b00020">${err.message}</li>`;
-      }
-    });
-  }
-</script>
-
+      /* --------------------- Initialisation --------------------- */
+      loadRatings();
+      loadRecommendations();
+    </script>
   </body>
 </html>

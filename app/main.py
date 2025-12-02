@@ -79,20 +79,3 @@ def token_stats(
         **stats
     }
 
-@app.post("/admin/init-db")
-def admin_init_db():
-    init_schema()
-    return {"status": "ok", "message": "schema created/verified"}
-
-@app.post("/admin/index-srt")
-def admin_index_srt(
-    file: str = Query(..., description="Chemin .srt ex: data/xxx.srt"),
-    show: str | None = Query(None),
-    season: int | None = Query(None),
-    ep: int | None = Query(None),
-):
-    p = Path(file)
-    if not p.exists():
-        raise HTTPException(status_code=404, detail=f"Fichier introuvable: {file}")
-    result = index_srt(str(p), show_name=show, season=season, episode=ep)
-    return {"status": "ok", "indexed": result}

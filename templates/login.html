@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Connexion - Series Reco</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body class="login-body">
+    <div class="login-hero">
+      <div class="login-overlay"></div>
+
+      <header class="login-topbar">
+        <div class="brand">
+          <span class="logo">SR</span>
+          <span class="brand-text">Series Reco</span>
+        </div>
+      </header>
+
+      <main class="login-main">
+        <section class="login-panel">
+          <h1>Se connecter</h1>
+          <p class="login-subtitle">
+            Connecte-toi pour retrouver tes recherches et recommandations de séries.
+          </p>
+
+          <form id="login-form" class="login-form">
+            <label>
+              Login
+              <input id="login" name="login" autocomplete="username" required />
+            </label>
+
+            <label>
+              Mot de passe
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autocomplete="current-password"
+                required
+              />
+            </label>
+
+            <button type="submit" class="btn primary login-btn">Se connecter</button>
+
+            <p id="status" class="status"></p>
+          </form>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      const loginForm = document.getElementById("login-form");
+      const statusEl = document.getElementById("status");
+
+      function setStatus(msg, type = "") {
+        statusEl.textContent = msg || "";
+        statusEl.className = "status " + (type || "");
+      }
+
+      function currentUser() {
+        return localStorage.getItem("login");
+      }
+    // Quand on arrive sur /login, on force la déconnexion
+    localStorage.removeItem("login");
+
+
+    
+
+      loginForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        setStatus("Connexion en cours...");
+        const body = {
+          login: loginForm.login.value.trim(),
+          password: loginForm.password.value,
+        };
+
+        try {
+          const resp = await fetch("/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          if (!resp.ok) throw new Error("Login ou mot de passe invalide");
+          const data = await resp.json();
+          localStorage.setItem("login", data.login);
+          setStatus("Connexion réussie, redirection...", "ok");
+          setTimeout(() => {
+            window.location.href = "/app";
+          }, 500);
+        } catch (err) {
+          localStorage.removeItem("login");
+          setStatus(err.message || "Erreur de connexion", "err");
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -6,24 +6,47 @@ import time
 router = APIRouter(prefix="/user", tags=["Recommandations"])
 
 # ==================== Réglages globaux (fixes) ====================
-RECO_LIMIT = 6          # nb de séries renvoyées
+RECO_LIMIT = 10          # nb de séries renvoyées
 RECO_TOP_TOKENS = 4      # nb de tokens conservés par série "aimée"
 RECO_MIN_RATING = 3      # note min pour considérer une série "appréciée"
 IDF_MIN, IDF_MAX = 1.0, 2.8  # fenêtre IDF pour éviter stop-words et noms propres
 
 
 # ==================== Noter / mettre à jour une note ====================
+
 @router.post("/rate")
 def rate_series(
     user_id: str = Body(...),
     show_name: str = Body(...),
-    rating: int   = Body(...),
+    rating: int = Body(...),
 ):
     """Enregistre (ou met à jour) la note d'un utilisateur pour une série (1..5)."""
+
+    # Vérif de la note
     if not (1 <= rating <= 5):
-        raise HTTPException(400, "La note doit être comprise entre 1 et 5.")
+        raise HTTPException(status_code=400, detail="La note doit être comprise entre 1 et 5.")
+
+    show_key = show_name.strip().lower()
 
     with get_connection() as conn, conn.cursor() as cur:
+        # 1) Vérifier que la série existe vraiment dans la base
+        cur.execute(
+            """
+            SELECT 1
+            FROM episodes
+            WHERE show_name = %s
+            LIMIT 1;
+            """,
+            (show_key,),
+        )
+        if cur.fetchone() is None:
+            # Rien trouvé -> on renvoie une erreur 400
+            raise HTTPException(
+                status_code=400,
+                detail="Cette série n'existe pas dans la base."
+            )
+
+        # 2) Si on arrive ici, on peut enregistrer / mettre à jour la note
         cur.execute(
             """
             INSERT INTO user_ratings (user_id, show_name, rating)
@@ -31,12 +54,11 @@ def rate_series(
             ON CONFLICT (user_id, show_name)
             DO UPDATE SET rating = EXCLUDED.rating;
             """,
-            (user_id, show_name.lower(), rating),
+            (user_id, show_key, rating),
         )
         conn.commit()
 
     return {"message": f"{show_name} = {rating}/5 pour {user_id}"}
-
 
 # ==================== Lister les notes d'un utilisateur ====================
 @router.get("/ratings/{user_id}")
